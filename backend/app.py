@@ -128,6 +128,9 @@ async def process_payment(request: PaymentRequest, current_user: dict = Depends(
     """
     Process a payment (requires authentication).
     """
+    if not current_user:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+
     amount = request.amount
 
     if amount <= 0:
