@@ -1,14 +1,14 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional
 from jose import jwt
 from datetime import datetime, timedelta
 import asyncio
 from fastapi.middleware.cors import CORSMiddleware
-
-
-
+from pydantic import BaseModel
 
 # ---- Initialization ----
 app = FastAPI()
@@ -16,7 +16,7 @@ app = FastAPI()
 # Allow CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"], 
+    allow_origins=["http://localhost:3000"],  # Update this if the frontend URL changes
     allow_credentials=True,
     allow_methods=["*"], 
     allow_headers=["*"],  
@@ -26,6 +26,9 @@ SECRET_KEY = "supersecretkey123"
 ALGORITHM = "HS256"
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+class PaymentRequest(BaseModel):
+    amount: float
 
 # In-memory user storage for simplicity
 users_db = {
@@ -56,7 +59,7 @@ def decode_token(token: str):
         return payload
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.InvalidTokenError:
+    except jwt.JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
@@ -79,6 +82,27 @@ class PaymentNotification(BaseModel):
     status: str
     amount: float
 
+# ---- Error Handling ----
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """
+    Custom handler for validation errors.
+    """
+    return JSONResponse(
+        status_code=422,
+        content={"detail": "Validation Error", "errors": exc.errors()}
+    )
+
+@app.exception_handler(HTTPException)
+async def custom_http_exception_handler(request: Request, exc: HTTPException):
+    """
+    Custom handler for HTTP exceptions to return detailed error messages.
+    """
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail}
+    )
+
 # ---- Endpoints ----
 
 @app.post("/token")
@@ -100,16 +124,20 @@ async def get_me(current_user: dict = Depends(get_current_user)):
     return {"username": current_user["username"], "role": current_user["role"]}
 
 @app.post("/payments/charge")
-async def process_payment(amount: float, current_user: dict = Depends(get_current_user)):
+async def process_payment(request: PaymentRequest, current_user: dict = Depends(get_current_user)):
     """
-    Simulates processing a payment (requires authentication).
+    Process a payment (requires authentication).
     """
+    amount = request.amount
+
+    if amount <= 0:
+        raise HTTPException(status_code=422, detail="Invalid payment amount")
 
     if current_user["role"] != "admin" and amount > 100:
         raise HTTPException(status_code=403, detail="Not authorized for large payments")
-    
+
     # Simulate asynchronous payment processing
-    await asyncio.sleep(2)  # Simulate delay
+    await asyncio.sleep(2)
     return {"status": "success", "amount": amount}
 
 @app.post("/webhooks/payment")

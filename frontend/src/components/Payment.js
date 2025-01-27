@@ -6,6 +6,13 @@ function Payment() {
 
   const handlePayment = async () => {
     setMessage("");
+  
+    // Validate amount before sending
+    if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+      setMessage("Error: Please enter a valid payment amount");
+      return;
+    }
+  
     try {
       const token = localStorage.getItem("token");
       const response = await fetch("http://localhost:8000/payments/charge", {
@@ -14,16 +21,22 @@ function Payment() {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`,
         },
-        body: JSON.stringify({ amount: parseFloat(amount) }),
+        body: JSON.stringify({ amount: parseFloat(amount) }), // Ensure it's a valid float
       });
-
-      if (!response.ok) throw new Error("Payment failed");
+  
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Payment failed");
+      }
+      
+  
       const data = await response.json();
       setMessage(`Payment of $${data.amount} was successful!`);
     } catch (err) {
       setMessage(`Error: ${err.message}`);
     }
   };
+  
 
   const simulateWebhook = async () => {
     setMessage("");
