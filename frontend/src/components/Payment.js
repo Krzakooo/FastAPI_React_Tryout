@@ -7,7 +7,6 @@ function Payment() {
   const handlePayment = async () => {
     setMessage("");
   
-    // Validate amount before sending
     if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
       setMessage("Error: Please enter a valid payment amount");
       return;
@@ -15,20 +14,27 @@ function Payment() {
   
     try {
       const token = localStorage.getItem("token");
+      if (!token) {
+        setMessage("Error: You must be logged in to make a payment.");
+        return;
+      }
+  
       const response = await fetch("http://localhost:8000/payments/charge", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`,
         },
-        body: JSON.stringify({ amount: parseFloat(amount) }), // Ensure it's a valid float
+        body: JSON.stringify({ amount: parseFloat(amount) }),
       });
   
       if (!response.ok) {
         const errorData = await response.json();
+        if (response.status === 401) {
+          throw new Error("Unauthorized. Please log in to proceed.");
+        }
         throw new Error(errorData.detail || "Payment failed");
       }
-      
   
       const data = await response.json();
       setMessage(`Payment of $${data.amount} was successful!`);

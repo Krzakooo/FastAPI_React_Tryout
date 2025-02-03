@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 import asyncio
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from fastapi import Security
 
 # ---- Initialization ----
 app = FastAPI()
@@ -72,6 +73,12 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         raise HTTPException(status_code=401, detail="User not found")
     return users_db[username]
 
+# ---- Dependency for Authentication ----
+def require_authenticated_user(current_user: dict = Depends(get_current_user)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return current_user
+
 # ---- Models ----
 class User(BaseModel):
     username: str
@@ -124,7 +131,7 @@ async def get_me(current_user: dict = Depends(get_current_user)):
     return {"username": current_user["username"], "role": current_user["role"]}
 
 @app.post("/payments/charge")
-async def process_payment(request: PaymentRequest, current_user: dict = Depends(get_current_user)):
+async def process_payment(request: PaymentNotification, current_user: dict = Security(require_authenticated_user)):
     """
     Process a payment (requires authentication).
     """
@@ -139,8 +146,7 @@ async def process_payment(request: PaymentRequest, current_user: dict = Depends(
     if current_user["role"] != "admin" and amount > 100:
         raise HTTPException(status_code=403, detail="Not authorized for large payments")
 
-    # Simulate asynchronous payment processing
-    await asyncio.sleep(2)
+    await asyncio.sleep(2)  # Simulate delay
     return {"status": "success", "amount": amount}
 
 @app.post("/webhooks/payment")
