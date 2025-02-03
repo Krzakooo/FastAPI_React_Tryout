@@ -131,7 +131,7 @@ async def get_me(current_user: dict = Depends(get_current_user)):
     return {"username": current_user["username"], "role": current_user["role"]}
 
 @app.post("/payments/charge")
-async def process_payment(request: PaymentNotification, current_user: dict = Security(require_authenticated_user)):
+async def process_payment(request: PaymentRequest, current_user: dict = Security(require_authenticated_user)):
     """
     Process a payment (requires authentication).
     """
